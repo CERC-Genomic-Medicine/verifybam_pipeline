@@ -3,8 +3,8 @@
 ## Requirements
 
 1. Download and compile [VerifyBamId2](https://github.com/Griffan/VerifyBamID).
-2. Verify that you are running Python 3 and the following packages are installed: argparse, pandas, matplotlib, fpdf.
-3. Verify thay you have samtools installed.
+2. Verify that you are running Python 3 and the following packages are installed: `argparse`, `pandas`, `matplotlib`, `fpdf`.
+3. Verify that you have `samtools` installed.
 
 ## Running
 
@@ -17,8 +17,8 @@
      * `params.bams` -- path to your BAM/CRAM file(s). You can use `glob` expressions to selecect multiple files.
      * `params.fasta` -- path to the genome reference FASTA file.
      * `params.genome_build` -- set to "b37" or "b38".
-     * `params.verifyBamId_dir` -- path to the VerifyBamID directory.
-     * `params.reported_sex` -- path to the file with the reported sex. It is a tab-delimied file with two columns named: "NAME", "SEX". The "NAME" column stores the sample name/id. The sample name/id must match the BAM/CRAM filename without suffixes. For example, if the BAM file name is "Sample123.run2.phase1.bam", then the sample will be referred to as "Sample123". The "SEX" columns stores self-reported sex values encoded as: F - female, M - male, NA - missing.
+     * `params.verifyBamId_dir` -- path to the `VerifyBamID` directory.
+     * `params.reported_sex` -- path to the file with the reported sex. It is a tab-delimied file with two columns named: "NAME", "SEX". The "NAME" column stores the sample name/id. The sample name/id must match the BAM/CRAM filename without suffixes. For example, if the BAM file name is "Sample123.run2.phase1.bam", then the sample will be referred to as "Sample123". The "SEX" column stores self-reported sex values encoded as: F - female, M - male, NA - missing.
      * `executor.$slurm.queueSize` -- maximal number of SLURM jobs to submit at once.
   
 3. Run pipeline.
