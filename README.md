@@ -15,6 +15,7 @@
 
 2. Modify `nextflow.config` configuration file.
      * `params.bams` -- path to your BAM/CRAM file(s). You can use `glob` expressions to selecect multiple files.
+     * `params.targets_bed` -- path to the WES target BED file. Used only when analyzing WES BAM/CRAM.
      * `params.fasta` -- path to the genome reference FASTA file.
      * `params.genome_build` -- set to "b37" or "b38".
      * `params.verifyBamId_dir` -- path to the `VerifyBamID` directory.
