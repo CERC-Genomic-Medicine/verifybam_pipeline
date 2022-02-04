@@ -2,6 +2,7 @@
 
 process verify_bams {
 	cache "lenient"
+	scratch true
 
 	errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
 	maxRetries 3
@@ -81,6 +82,7 @@ process concat_1000g_contamination {
 
 process compute_bams_dp {
 	cache "lenient"
+	scratch true
 
         errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
         maxRetries 3
