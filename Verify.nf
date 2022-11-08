@@ -148,7 +148,6 @@ process compute_bams_dp {
 
         input:
         tuple val(name), file(bam), file(bam_index) from Channel.fromPath(params.bams).map{ bam -> [ bam.getSimpleName(), bam, bam + (bam.getExtension() == "bam" ? ".bai" : ".crai") ] }
-        each file(fasta) from Channel.fromPath(params.fasta)
 
         output:
         file "${name}.dp.txt" into bam_dp
@@ -157,7 +156,7 @@ process compute_bams_dp {
 	publishDir "results/dp/", pattern: "*.by_chrom.txt", mode: "copy"
 
         """
-	samtools depth -a -s -q10 -Q10 --reference ${fasta} ${bam} | aggregate_dp.py -o ${name}.dp
+	samtools depth -a -s -q10 -Q10 ${bam} | aggregate_dp.py -o ${name}.dp
         """
 }
 
