@@ -164,6 +164,7 @@ process compute_bams_dp {
 process concat_bams_dp {
 
 	executor "local"
+	memory '4 GB'
 	cpus 1
 
 	input:
@@ -186,6 +187,7 @@ process concat_bams_dp {
 process join {
 
 	executor "local"
+	memory '4 GB'
 	cpus 1
 
 	input:
@@ -212,6 +214,7 @@ process join {
 process plot {
 
 	executor "local"
+	memory '4 GB'
 	cpus 1
 
 	input:
