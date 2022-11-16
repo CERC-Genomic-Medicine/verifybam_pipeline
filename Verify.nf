@@ -32,6 +32,7 @@ process verify_bams {
 process concat_hgdp_ancestry {
 
 	executor "local"
+	memory '4 GB'
 	cpus 1
 
 	input:
@@ -62,6 +63,7 @@ process concat_hgdp_ancestry {
 process concat_hgdp_contamination {
 
 	executor "local"
+	memory '4 GB'
 	cpus 1
 
 	input:
@@ -87,6 +89,7 @@ process concat_hgdp_contamination {
 process concat_1000g_ancestry {
 
 	executor "local"
+	memory '4 GB'
 	cpus 1
 
 	input:
@@ -117,6 +120,7 @@ process concat_1000g_ancestry {
 process concat_1000g_contamination {
 
 	executor "local"
+	memory '4 GB'
 	cpus 1
 
 	input:
