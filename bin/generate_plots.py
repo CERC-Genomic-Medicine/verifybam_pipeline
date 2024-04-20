@@ -238,6 +238,41 @@ def tabulate_inferred_genetic_ancestry(inferred_ancestries, reference_colors, re
     plt.savefig(output_filename, bbox_inches='tight')
 
 
+def tabulate_possibly_truncated(summary, output_filename):
+    # Expect 1-22,X,Y to be present
+    truncated = summary[(summary['ALL_CHROMS'] < 24) | (summary['AUTO_CHROMS'] < 22)][['NAME', 'ALL_CHROMS', 'AUTO_CHROMS']]
+
+    n_truncated = len(truncated)
+    top_truncated = truncated.head(30)
+    
+    fig = plt.figure(figsize=(7, 10), dpi = 300)
+    ax = plt.subplot(111, frame_on = False)
+    ax.xaxis.set_visible(False)
+    ax.yaxis.set_visible(False)
+    if n_truncated > 0:
+        table = ax.table(cellText = top_truncated.values, colLabels = top_truncated.columns, loc = "center", colColours = ['lightgrey'] * 3, fontsize = 14)
+        table.auto_set_font_size(False)
+    ax.set_title(f'First {len(top_truncated)} out of {n_truncated} BAM/CRAM files with incomplete number of chromosomes.\n[Table is empty if all good]')
+    plt.savefig(output_filename, bbox_inches='tight')
+
+
+def tabulate_contaminated_samples(summary, output_filename):
+    contaminated =  summary[(summary['1000G_FREEMIX'] > 0.05) | (summary['HGDP_FREEMIX'] > 0.05)][['NAME', '1000G_FREEMIX', 'HGDP_FREEMIX']]
+
+    n_contaminated = len(contaminated)
+    top_contaminated = contaminated.head(30)
+
+    fig = plt.figure(figsize=(7, 10), dpi = 300)
+    ax = plt.subplot(111, frame_on = False)
+    ax.xaxis.set_visible(False)
+    ax.yaxis.set_visible(False)
+    if n_contaminated > 0:
+        table = ax.table(cellText = top_contaminated.values, colLabels = top_contaminated.columns, loc = "center", colColours = ['lightgrey'] * 3, fontsize = 14)
+        table.auto_set_font_size(False)
+    ax.set_title(f'First {len(top_contaminated)} out of {n_contaminated} BAM/CRAM files with possible contamination.\n[Table is empty if all good]')
+    plt.savefig(output_filename)
+
+
 if __name__ == '__main__':
     args = argparser.parse_args()
 
@@ -247,6 +282,8 @@ if __name__ == '__main__':
     plot_coverage(summary, 'coverage.jpeg')
     plot_contamination(summary, 'contamination_boxplot.jpeg')
     tabulate_contamination(summary, 'contamination_table.jpeg')
+    tabulate_possibly_truncated(summary, 'truncated_table.jpeg')
+    tabulate_contaminated_samples(summary, 'contamination_per_sample_table.jpeg')
 
     pca_1000g = pd.read_csv(args.pca_1000g_filename, sep = '\t', header = None, names = ['SAMPLE', 'PC1', 'PC2', 'PC3', 'PC4'], usecols = [0, 1, 2, 3, 4])
     pop_1000g = pd.read_csv(args.pop_1000g_filename, sep = '\t')
@@ -269,7 +306,7 @@ if __name__ == '__main__':
         inferred_ancestry = infer_genetic_ancestry(summary, samples_hgdp, 'HGDP')
         tabulate_inferred_genetic_ancestry(inferred_ancestry, colors_hgdp, 'HGDP', 'HGDP_inferred_ancestry_table.jpeg')
 
-    reported_sex = pd.read_csv(args.reported_sex_filename, sep = '\t')
+    reported_sex = pd.read_csv(args.reported_sex_filename, sep = '\t', dtype = {'SEX': 'str'})
     summary_with_sex = summary.merge(reported_sex, on = 'NAME', how = 'left')
     plot_reported_sex(summary, summary_with_sex, 'XY_depth_vs_reported_sex.jpeg')
 

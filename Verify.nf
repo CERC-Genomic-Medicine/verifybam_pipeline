@@ -1,22 +1,33 @@
+#!/usr/bin/env nextflow
+/*
+* AUTHOR: Daniel Taliun <daniel.taliun@mcgill.ca>
+* VERSION: 2.0
+* YEAR: 2024
+*/
 
 
 process verify_bams {
 	cache "lenient"
+	
+	executor 'slurm'
+	scratch '$SLURM_TMPDIR'
 
 	errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
 	maxRetries 3
 	cpus 1
+   	memory "4GB"
+   	time "4h"
 
 	input:
-	tuple val(name), file(bam), file(bam_index) from Channel.fromPath(params.bams).map{ bam -> [ bam.getSimpleName(), bam, bam + (bam.getExtension() == "bam" ? ".bai" : ".crai") ] }
-	each file(fasta) from Channel.fromPath(params.fasta)
+	tuple val(name), file(bam), file(bam_index)
+	path fasta
 
 	output:
-	file "${name}.HGDP.Ancestry" into bam_hgdp_ancestry
-	file "${name}.HGDP.selfSM" into bam_hgdp_contamination
-	file "${name}.1000G.Ancestry" into bam_1000g_ancestry
-	file "${name}.1000G.selfSM" into bam_1000g_contamination
-	file "*.log" into verify_bam_logs
+	path("${name}.HGDP.Ancestry")
+	path("${name}.HGDP.selfSM")
+	path("${name}.1000G.Ancestry")
+	path("${name}.1000G.selfSM")
+	path("*.log")
 
 	publishDir "results/verifyBamId_logs/HGDP", pattern: "*.HGDP.log", mode: "copy"
 	publishDir "results/verifyBamId_logs/1000G", pattern: "*.1000G.log", mode: "copy"
@@ -28,6 +39,33 @@ process verify_bams {
 	"""
 }
 
+process compute_bams_dp {
+	cache "lenient"
+
+        executor 'slurm'
+        scratch '$SLURM_TMPDIR'
+
+        errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
+        maxRetries 3
+        cpus 1
+	memory "64GB"
+	time "12h"
+
+        input:
+        tuple val(name), path(bam), path(bam_index)
+	path fasta
+
+        output:
+        path("${name}.dp.txt")
+	path("*.by_chrom.txt")
+
+	publishDir "results/dp/", pattern: "*.by_chrom.txt", mode: "copy"
+
+        """
+	samtools depth --reference ${fasta} -a -s -q10 -Q10 ${bam} | aggregate_dp.py -o ${name}.dp
+        """
+}
+
 
 process concat_hgdp_ancestry {
 
@@ -36,10 +74,10 @@ process concat_hgdp_ancestry {
 	cpus 1
 
 	input:
-	file ancestry_files from bam_hgdp_ancestry.collect()
+	path ancestry_files
 
 	output:
-	file("hgdp_ancestry.txt") into hgdp_ancestry
+	path("hgdp_ancestry.txt")
 
 	"""
 	printf "NAME" > hgdp_ancestry.txt
@@ -67,10 +105,10 @@ process concat_hgdp_contamination {
 	cpus 1
 
 	input:
-	file contamination_files from bam_hgdp_contamination.collect()
+	path contamination_files
 
 	output:
-	file("hgdp_contamination.txt") into hgdp_contamination
+	path("hgdp_contamination.txt")
 
 	"""
 	printf "NAME\tHGDP_SNPS\tHGDP_AVG_DP\tHGDP_FREEMIX\n" > hgdp_contamination.txt
@@ -93,10 +131,10 @@ process concat_1000g_ancestry {
 	cpus 1
 
 	input:
-	file ancestry_files from bam_1000g_ancestry.collect()
+	path ancestry_files
 
 	output:
-	file("1000g_ancestry.txt") into _1000g_ancestry
+	path("1000g_ancestry.txt")
 
 	"""
 	printf "NAME" > 1000g_ancestry.txt
@@ -124,10 +162,10 @@ process concat_1000g_contamination {
 	cpus 1
 
 	input:
-	file contamination_files from bam_1000g_contamination.collect()
+	path contamination_files
 
 	output:
-	file("1000g_contamination.txt") into _1000g_contamination
+	path("1000g_contamination.txt")
 
 	"""
 	printf "NAME\t1000G_SNPS\t1000G_AVG_DP\t1000G_FREEMIX\n" > 1000g_contamination.txt
@@ -143,27 +181,6 @@ process concat_1000g_contamination {
 }
 
 
-process compute_bams_dp {
-	cache "lenient"
-
-        errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
-        maxRetries 3
-        cpus 1
-
-        input:
-        tuple val(name), file(bam), file(bam_index) from Channel.fromPath(params.bams).map{ bam -> [ bam.getSimpleName(), bam, bam + (bam.getExtension() == "bam" ? ".bai" : ".crai") ] }
-
-        output:
-        file "${name}.dp.txt" into bam_dp
-	file "*.by_chrom.txt" into bam_dp_by_chrom
-
-	publishDir "results/dp/", pattern: "*.by_chrom.txt", mode: "copy"
-
-        """
-	samtools depth -a -s -q10 -Q10 ${bam} | aggregate_dp.py -o ${name}.dp
-        """
-}
-
 
 process concat_bams_dp {
 
@@ -172,10 +189,10 @@ process concat_bams_dp {
 	cpus 1
 
 	input:
-	file bam_dp_files from bam_dp.collect()
+	path  bam_dp_files
 
 	output:
-	file("dp.txt") into dp
+	path("dp.txt")
 
 	"""
 	filename=`find . -name "*.dp.txt" | head -n1`
@@ -195,14 +212,14 @@ process join {
 	cpus 1
 
 	input:
-	file dp_file from dp
-	file contamination_hgdp_file from hgdp_contamination
-	file ancestry_hgdp_file from hgdp_ancestry
-	file contamination_1000g_file from _1000g_contamination
-	file ancestry_1000g_file from _1000g_ancestry
+	path dp_file
+	path contamination_hgdp_file
+	path ancestry_hgdp_file 
+	path contamination_1000g_file
+	path ancestry_1000g_file
 
 	output:
-	file "summary.txt" into summarized
+	path("summary.txt")
 
 	publishDir "results/", pattern: "*.txt", mode: "copy"
 
@@ -222,12 +239,12 @@ process plot {
 	cpus 1
 
 	input:
-	file summary from summarized
-	file reported_sex from Channel.fromPath(params.reported_sex)
+	path summary
+	path reported_sex
 
 	output:
-	file "*.jpeg" into plots
-	file "report.pdf" into report
+	path("*.jpeg")
+	path("report.pdf")
 
 	publishDir "results/plots/", pattern: "*.jpeg", mode: "copy"
 	publishDir "results/", pattern: "*.pdf", mode: "copy"
@@ -236,5 +253,21 @@ process plot {
 	generate_plots.py -s ${summary} -pca1 ${params.verifyBamId_dir}/resource/1000g.phase3.100k.${params.genome_build}.vcf.gz.dat.V -pop1 ${workflow.projectDir}/Populations/1000g_populations.txt -pca2 ${params.verifyBamId_dir}/resource/hgdp.100k.${params.genome_build}.vcf.gz.dat.V -pop2 ${workflow.projectDir}/Populations/HGDP_populations.txt -sex ${reported_sex}
 	make_pdf.py -o report.pdf
 	"""
+}
+
+workflow {
+	bams = Channel.fromFilePairs("${params.bams}", size: -1) { file -> file.getName().replaceAll("(.bai|.crai)\$", "") }.map {it -> [it[0].replaceAll("(.bam|.cram)\$", ""), it[1][0], it[1][1]] }
+
+	verify_estimates = verify_bams(bams, Channel.fromPath(params.fasta).collect())
+	depths = compute_bams_dp(bams, Channel.fromPath(params.fasta).collect())
+
+	all = join(
+		concat_bams_dp(depths[0].collect()),
+		concat_hgdp_contamination(verify_estimates[1].collect()),
+		concat_hgdp_ancestry(verify_estimates[0].collect()),
+		concat_1000g_contamination(verify_estimates[3].collect()),
+ 		concat_1000g_ancestry(verify_estimates[2].collect())
+	) 
+	plot(all, Channel.fromPath(params.reported_sex))
 }
 

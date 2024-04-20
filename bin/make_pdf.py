@@ -36,8 +36,14 @@ if __name__ == '__main__':
     pdf.image('coverage.jpeg', x = 0.1, y = 0.7, w = 8, h = 0, type = '', link = '')
 
     pdf.add_page()
+    pdf.image('truncated_table.jpeg', x = 0.1, y = 0.7, w = 8, h = 0, type = '', link = '')
+
+    pdf.add_page()
     pdf.image('contamination_boxplot.jpeg', x = 2, y = 0.7, w = 4, h = 0, type = '', link = '')
     pdf.image('contamination_table.jpeg', x = 0, y = 5.7, w = 7, h = 0, type = '', link = '')
+
+    pdf.add_page()
+    pdf.image('contamination_per_sample_table.jpeg', x = 0.1, y = 0.7, w = 8, h = 0, type = '', link = '')
 
     pdf.add_page()
     pdf.image('1000G_pca.jpeg', x = 0.1, y = 0.7, w = 8, h = 0, type = '', link = '')
