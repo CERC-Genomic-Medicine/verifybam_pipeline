@@ -50,7 +50,8 @@ Below you can find description of the `summary.txt` columns:
  | Column | Description |
  | --- | --- |
  | NAME | Sample name, which is equal to the corresponding BAM/CRAM name without a suffix. |
- | HGDP_SNPS | number of SNPs used by VerifyBamId for estimating contamination using the HGDP reference panel. This columns is not present when analyzing WES data. |
+ | HGDP_SNPS_OVERLAP | number of SNPs used by VerifyBamId for estimating contamination using the HGDP reference panel. This columns is not present when analyzing WES data. |
+ | HGDP_SNPS | number of SNPs within the HGDP reference panel. This columns is not present when analyzing WES data. |
  | HGDP_AVG_DP | average read depth at SNPs used by VerifyBamId for estimating contamination using the HGDP reference panel. This columns is not present when analyzing WES data. |
  | HGDP_FREEMIX | VerifyBamId estimated contamination using the HGDP reference panel. This columns is not present when analyzing WES data. |
  | HGDP_PC1_CONTAMINATING | Contaminating sample's PC1 projected to the HGDP PCA space. This columns is not present when analyzing WES data. |
@@ -61,9 +62,10 @@ Below you can find description of the `summary.txt` columns:
  | HGDP_PC3_INTENDED | Intended sample's PC3 projected to the HGDP PCA space. This columns is not present when analyzing WES data. |
  | HGDP_PC4_CONTAMINATING | Contaminating sample's PC4 projected to the HGDP PCA space. This columns is not present when analyzing WES data. |
  | HGDP_PC4_INTENDED | Intended sample's PC4 projected to the HGDP PCA space. This columns is not present when analyzing WES data. |
- | 1000G_SNPS | number of SNPs used by VerifyBamId for estimating contamination using the 1000G reference panel. |
+ | 1000G_SNPS_OVERLAP | number of SNPs used by VerifyBamId for estimating contamination using the 1000G reference panel. This columns is not present when analyzing WES data. |
+ | 1000G_SNPS | number of SNPs within the 1000G reference panel. |
  | 1000G_AVG_DP | average read depth at SNPs used by VerifyBamId for estimating contamination using the 1000G reference panel. |
- | 1000G_FREEMIX | VerifyBamId estimated contamination using the HGDP reference panel. |
+ | 1000G_FREEMIX | VerifyBamId estimated contamination using the 1000G reference panel. |
  | 1000G_PC1_CONTAMINATING | Contaminating sample's PC1 projected to the 1000G PCA space. |
  | 1000G_PC1_INTENDED | Intended sample's PC1 projected to the 1000G PCA space. |
  | 1000G_PC2_CONTAMINATING | Contaminating sample's PC2 projected to the 1000G PCA space. |
