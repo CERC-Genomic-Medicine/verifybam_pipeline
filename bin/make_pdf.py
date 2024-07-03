@@ -46,6 +46,9 @@ if __name__ == '__main__':
     pdf.image('contamination_per_sample_table.jpeg', x = 0.1, y = 0.7, w = 8, h = 0, type = '', link = '')
 
     pdf.add_page()
+    pdf.image('low_SNP_per_sample_table.jpeg', x = 0.1, y = 0.7, w = 8, h = 0, type = '', link = '')
+
+    pdf.add_page()
     pdf.image('1000G_pca.jpeg', x = 0.1, y = 0.7, w = 8, h = 0, type = '', link = '')
     pdf.image('1000G_inferred_ancestry_table.jpeg', x = 0.1, y = 8.7, w = 8, h = 0, type = '', link = '')
 

@@ -262,14 +262,28 @@ def tabulate_contaminated_samples(summary, output_filename):
     n_contaminated = len(contaminated)
     top_contaminated = contaminated.head(30)
 
-    fig = plt.figure(figsize=(7, 10), dpi = 300)
+    fig = plt.figure(figsize=(10, 10), dpi = 300)
     ax = plt.subplot(111, frame_on = False)
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
     if n_contaminated > 0:
         table = ax.table(cellText = top_contaminated.values, colLabels = top_contaminated.columns, loc = "center", colColours = ['lightgrey'] * 3, fontsize = 14)
-        table.auto_set_font_size(False)
+        table.auto_set_font_size(True)
     ax.set_title(f'First {len(top_contaminated)} out of {n_contaminated} BAM/CRAM files with possible contamination.\n[Table is empty if all good]')
+    plt.savefig(output_filename)
+
+def tabulate_low_SNP_samples(summary, output_filename):
+    low_SNP =  summary[(summary['HGDP_SNPS_OVERLAP'] < 1000) | (summary['1000G_SNPS_OVERLAP'] < 1000)][['NAME', '1000G_FREEMIX', 'HGDP_FREEMIX','1000G_SNPS_OVERLAP','HGDP_SNPS_OVERLAP']]
+    n_low_SNP = len(low_SNP)
+    top_low_SNP = low_SNP.head(10)
+    fig = plt.figure(figsize=(13, 10), dpi = 300)
+    ax = plt.subplot(111, frame_on = False)
+    ax.xaxis.set_visible(False)
+    ax.yaxis.set_visible(False)
+    if n_low_SNP > 0:
+        table = ax.table(cellText = top_low_SNP.values, colLabels = top_low_SNP.columns, loc = "center", colColours = ['lightgrey'] * 5, fontsize = 14)
+        table.auto_set_font_size(True)
+    ax.set_title(f'First {len(top_low_SNP)} out of {n_low_SNP} BAM/CRAM files \n with low overlap with panel.\n[Table is empty if all good]', fontsize = 14)
     plt.savefig(output_filename)
 
 
@@ -284,6 +298,7 @@ if __name__ == '__main__':
     tabulate_contamination(summary, 'contamination_table.jpeg')
     tabulate_possibly_truncated(summary, 'truncated_table.jpeg')
     tabulate_contaminated_samples(summary, 'contamination_per_sample_table.jpeg')
+    tabulate_low_SNP_samples(summary, 'low_SNP_per_sample_table.jpeg')
 
     pca_1000g = pd.read_csv(args.pca_1000g_filename, sep = '\t', header = None, names = ['SAMPLE', 'PC1', 'PC2', 'PC3', 'PC4'], usecols = [0, 1, 2, 3, 4])
     pop_1000g = pd.read_csv(args.pop_1000g_filename, sep = '\t')

@@ -15,8 +15,8 @@ process verify_bams {
 	errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
 	maxRetries 3
 	cpus 1
-   	memory "4GB"
-   	time "4h"
+   	memory "3GB"
+   	time "2h"
 
 	input:
 	tuple val(name), file(bam), file(bam_index)
@@ -27,15 +27,17 @@ process verify_bams {
 	path("${name}.HGDP.selfSM")
 	path("${name}.1000G.Ancestry")
 	path("${name}.1000G.selfSM")
-	path("*.log")
+	path("${name}.HGDP.log")
+	path("${name}.1000G.log")
 
 	publishDir "results/verifyBamId_logs/HGDP", pattern: "*.HGDP.log", mode: "copy"
 	publishDir "results/verifyBamId_logs/1000G", pattern: "*.1000G.log", mode: "copy"
 
-
 	"""
-	${params.verifyBamId_dir}/bin/VerifyBamID --SVDPrefix ${params.verifyBamId_dir}/resource/hgdp.100k.${params.genome_build}.vcf.gz.dat --Reference ${fasta} --BamFile ${bam} --NumThread 1 --NumPC 4 --Output ${name}.HGDP 2>&1 | tee ${name}.HGDP.log
-	${params.verifyBamId_dir}/bin/VerifyBamID --SVDPrefix ${params.verifyBamId_dir}/resource/1000g.phase3.100k.${params.genome_build}.vcf.gz.dat --Reference ${fasta} --BamFile ${bam} --NumThread 1 --NumPC 4 --Output ${name}.1000G 2>&1 | tee ${name}.1000G.log
+	${params.verifyBamId_dir}/bin/VerifyBamID --SVDPrefix ${params.verifyBamId_dir}/resource/hgdp.100k.${params.genome_build}.vcf.gz.dat --DisableSanityCheck --Reference ${fasta} --BamFile ${bam} --NumThread 1 --NumPC 4 --Output ${name}.HGDP 2>&1 | tee ${name}.HGDP.log
+
+	${params.verifyBamId_dir}/bin/VerifyBamID --SVDPrefix ${params.verifyBamId_dir}/resource/1000g.phase3.100k.${params.genome_build}.vcf.gz.dat --DisableSanityCheck --Reference ${fasta} --BamFile ${bam} --NumThread 1 --NumPC 4 --Output ${name}.1000G 2>&1 | tee ${name}.1000G.log
+
 	"""
 }
 
@@ -45,11 +47,10 @@ process compute_bams_dp {
         executor 'slurm'
         scratch '$SLURM_TMPDIR'
 
-        errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
         maxRetries 3
         cpus 1
-	memory "64GB"
-	time "12h"
+	memory "2GB"
+	time "5h"
 
         input:
         tuple val(name), path(bam), path(bam_index)
@@ -70,7 +71,7 @@ process compute_bams_dp {
 process concat_hgdp_ancestry {
 
 	executor "local"
-	memory '4 GB'
+	memory '1 GB'
 	cpus 1
 
 	input:
@@ -98,10 +99,35 @@ process concat_hgdp_ancestry {
 }
 
 
+process concat_hgdp_log {
+
+	executor "local"
+        memory '1 GB'
+        cpus 1
+
+        input:
+        path log_files
+
+        output:
+        path("hgdp_log.txt")
+
+        """
+	printf "NAME\tHGDP_SNPS_OVERLAP\n" > hgdp_log.txt
+		for f in `find . -name "*.HGDP.log" -printf "%f\n" | sort`; do
+		name=\${f%%.*}
+		printf "%s" "\${name}"
+		snps_overlap=\$(grep -Po "(?<=\\[SimplePileup\\] Total Number Markers: )[0-9]+"  \${f})
+		printf "\t%s" "\${snps_overlap}"
+		printf "\n"
+	done >> hgdp_log.txt
+        """
+}
+
+
 process concat_hgdp_contamination {
 
 	executor "local"
-	memory '4 GB'
+	memory '1 GB'
 	cpus 1
 
 	input:
@@ -127,7 +153,7 @@ process concat_hgdp_contamination {
 process concat_1000g_ancestry {
 
 	executor "local"
-	memory '4 GB'
+	memory '1 GB'
 	cpus 1
 
 	input:
@@ -154,11 +180,35 @@ process concat_1000g_ancestry {
 	"""
 }
 
+process concat_1000g_log {
+	
+	executor "local"
+        memory '1 GB'
+        cpus 1
+
+        input:
+        path log_files
+
+        output:
+        path("1000g_log.txt")
+
+	"""
+	printf "NAME\t1000G_SNPS_OVERLAP\n" > 1000g_log.txt
+	for f in `find . -name "*.1000G.log" -printf "%f\n" | sort`; do
+		name=\${f%%.*}
+		printf "%s" "\${name}"
+		snps_overlap=\$(grep -Po "(?<=\\[SimplePileup\\] Total Number Markers: )[0-9]+"  \${f})
+		printf "\t%s" "\${snps_overlap}"
+		printf "\n"
+	done >> 1000g_log.txt
+	"""
+
+}
 
 process concat_1000g_contamination {
 
 	executor "local"
-	memory '4 GB'
+	memory '1 GB'
 	cpus 1
 
 	input:
@@ -170,12 +220,12 @@ process concat_1000g_contamination {
 	"""
 	printf "NAME\t1000G_SNPS\t1000G_AVG_DP\t1000G_FREEMIX\n" > 1000g_contamination.txt
 	for f in `find . -name "*.selfSM" -printf "%f\n" | sort`; do
-		name=\${f%%.*}
-		printf "%s" "\${name}"
-		printf "\t%s" `cut -f4 \${f} | tail -n1`
-		printf "\t%s" `cut -f6 \${f} | tail -n1`
-		printf "\t%s" `cut -f7 \${f} | tail -n1`
-		printf "\n"
+                name=\${f%%.*}
+                printf "%s" "\${name}"
+                printf "\t%s" `cut -f4 \${f} | tail -n1`
+                printf "\t%s" `cut -f6 \${f} | tail -n1`
+                printf "\t%s" `cut -f7 \${f} | tail -n1`
+                printf "\n"
 	done >> 1000g_contamination.txt
 	"""
 }
@@ -185,7 +235,7 @@ process concat_1000g_contamination {
 process concat_bams_dp {
 
 	executor "local"
-	memory '4 GB'
+	memory '1 GB'
 	cpus 1
 
 	input:
@@ -205,17 +255,19 @@ process concat_bams_dp {
 }
 
 
-process join {
+process joined {
 
 	executor "local"
-	memory '4 GB'
+	memory '1 GB'
 	cpus 1
 
 	input:
 	path dp_file
 	path contamination_hgdp_file
+	path log_hgdp_file
 	path ancestry_hgdp_file 
 	path contamination_1000g_file
+	path log_1000g_file
 	path ancestry_1000g_file
 
 	output:
@@ -224,8 +276,8 @@ process join {
 	publishDir "results/", pattern: "*.txt", mode: "copy"
 
 	"""
-	join --check-order --header ${contamination_hgdp_file} ${ancestry_hgdp_file} > hgdp.txt
-	join --check-order --header ${contamination_1000g_file} ${ancestry_1000g_file} > 1000g.txt
+	join --check-order --header ${contamination_hgdp_file} ${ancestry_hgdp_file} | join --check-order --header - ${log_hgdp_file} > hgdp.txt
+	join --check-order --header ${contamination_1000g_file} ${ancestry_1000g_file}| join --check-order --header - ${log_1000g_file} > 1000g.txt
 	join --check-order --header hgdp.txt 1000g.txt > contamination_ancestry.txt
 	join --check-order --header contamination_ancestry.txt ${dp_file} > summary.txt
 	"""
@@ -257,15 +309,19 @@ process plot {
 
 workflow {
 	bams = Channel.fromFilePairs("${params.bams}", size: -1) { file -> file.getName().replaceAll("(.bai|.crai)\$", "") }.map {it -> [it[0].replaceAll("(.bam|.cram)\$", ""), it[1][0], it[1][1]] }
+	bams.view()
+	Channel.fromPath(params.fasta).collect().view()
 
 	verify_estimates = verify_bams(bams, Channel.fromPath(params.fasta).collect())
 	depths = compute_bams_dp(bams, Channel.fromPath(params.fasta).collect())
 
-	all = join(
+	all = joined(
 		concat_bams_dp(depths[0].collect()),
 		concat_hgdp_contamination(verify_estimates[1].collect()),
+		concat_hgdp_log(verify_estimates[4].collect()),
 		concat_hgdp_ancestry(verify_estimates[0].collect()),
 		concat_1000g_contamination(verify_estimates[3].collect()),
+		concat_1000g_log(verify_estimates[5].collect()),
  		concat_1000g_ancestry(verify_estimates[2].collect())
 	) 
 	plot(all, Channel.fromPath(params.reported_sex))
