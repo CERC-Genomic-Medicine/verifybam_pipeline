@@ -1,40 +1,78 @@
+#!/usr/bin/env nextflow
+/*
+* AUTHOR: Daniel Taliun <daniel.taliun@mcgill.ca>
+* VERSION: 2.0
+* YEAR: 2024
+*/
 
 
 process verify_bams {
 	cache "lenient"
-	scratch true
+	
+	executor 'slurm'
+	scratch '$SLURM_TMPDIR'
 
 	errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
 	maxRetries 3
 	cpus 1
+   	memory "3GB"
+   	time "2h"
 
 	input:
-	tuple val(name), file(bam), file(bam_index) from Channel.fromPath(params.bams).map{ bam -> [ bam.getSimpleName(), bam, bam + (bam.getExtension() == "bam" ? ".bai" : ".crai") ] }
-	each file(fasta) from Channel.fromPath(params.fasta)
+	tuple val(name), file(bam), file(bam_index)
+	path fasta
 
 	output:
-	file "${name}.1000G.Ancestry" into bam_1000g_ancestry
-	file "${name}.1000G.selfSM" into bam_1000g_contamination
-	file "*.1000G.log" into verify_bam_logs
+	path("${name}.1000G.Ancestry")
+	path("${name}.1000G.selfSM")
+	path("${name}.1000G.log")
 
+	publishDir "results/verifyBamId_logs/HGDP", pattern: "*.HGDP.log", mode: "copy"
 	publishDir "results/verifyBamId_logs/1000G", pattern: "*.1000G.log", mode: "copy"
 
 	"""
-	${params.verifyBamId_dir}/bin/VerifyBamID --SVDPrefix ${params.verifyBamId_dir}/resource/exome/1000g.phase3.10k.${params.genome_build}.exome.vcf.gz.dat --Reference ${fasta} --BamFile ${bam} --NumThread 1 --NumPC 4 --Output ${name}.1000G 2>&1 | tee ${name}.1000G.log
+
+${params.verifyBamId_dir}/bin/VerifyBamID --SVDPrefix ${params.verifyBamId_dir}/resource/exome/1000g.phase3.10k.${params.genome_build}.exome.vcf.gz.dat --Reference ${fasta} --BamFile ${bam} --NumThread 1 --DisableSanityCheck  --NumPC 4 --Output ${name}.1000G 2>&1 | tee ${name}.1000G.log
+
+
 	"""
 }
 
+process compute_bams_dp {
+	cache "lenient"
+	scratch true
+
+        errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
+        maxRetries 3
+        cpus 1
+
+        input:
+        tuple val(name), path(bam), path(bam_index)
+        each file(fasta)
+	each file(targets)
+
+        output:
+        file "${name}.dp.txt"
+	file "*.by_chrom.txt"
+
+	publishDir "results/dp/", pattern: "*.by_chrom.txt", mode: "copy"
+
+        """
+	samtools depth -a -s -q20 -Q20 --reference ${fasta} -b ${targets} ${bam} | aggregate_dp.py -o ${name}.dp
+        """
+}
 
 process concat_1000g_ancestry {
 
 	executor "local"
+	memory '1 GB'
 	cpus 1
 
 	input:
-	file ancestry_files from bam_1000g_ancestry.collect()
+	path ancestry_files
 
 	output:
-	file("1000g_ancestry.txt") into _1000g_ancestry
+	path("1000g_ancestry.txt")
 
 	"""
 	printf "NAME" > 1000g_ancestry.txt
@@ -54,67 +92,69 @@ process concat_1000g_ancestry {
 	"""
 }
 
+process concat_1000g_log {
+	
+	executor "local"
+        memory '1 GB'
+        cpus 1
+
+        input:
+        path log_files
+
+        output:
+        path("1000g_log.txt")
+
+	"""
+	printf "NAME\t1000G_SNPS_OVERLAP\n" > 1000g_log.txt
+	for f in `find . -name "*.1000G.log" -printf "%f\n" | sort`; do
+		name=\${f%%.*}
+		printf "%s" "\${name}"
+		snps_overlap=\$(grep -Po "(?<=\\[SimplePileup\\] Total Number Markers: )[0-9]+"  \${f})
+		printf "\t%s" "\${snps_overlap}"
+		printf "\n"
+	done >> 1000g_log.txt
+	"""
+
+}
 
 process concat_1000g_contamination {
 
 	executor "local"
+	memory '1 GB'
 	cpus 1
 
 	input:
-	file contamination_files from bam_1000g_contamination.collect()
+	path contamination_files
 
 	output:
-	file("1000g_contamination.txt") into _1000g_contamination
+	path("1000g_contamination.txt")
 
 	"""
 	printf "NAME\t1000G_SNPS\t1000G_AVG_DP\t1000G_FREEMIX\n" > 1000g_contamination.txt
 	for f in `find . -name "*.selfSM" -printf "%f\n" | sort`; do
-		name=\${f%%.*}
-		printf "%s" "\${name}"
-		printf "\t%s" `cut -f4 \${f} | tail -n1`
-		printf "\t%s" `cut -f6 \${f} | tail -n1`
-		printf "\t%s" `cut -f7 \${f} | tail -n1`
-		printf "\n"
+                name=\${f%%.*}
+                printf "%s" "\${name}"
+                printf "\t%s" `cut -f4 \${f} | tail -n1`
+                printf "\t%s" `cut -f6 \${f} | tail -n1`
+                printf "\t%s" `cut -f7 \${f} | tail -n1`
+                printf "\n"
 	done >> 1000g_contamination.txt
 	"""
 }
 
 
-process compute_bams_dp {
-	cache "lenient"
-	scratch true
-
-        errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return "retry" }
-        maxRetries 3
-        cpus 1
-
-        input:
-        tuple val(name), file(bam), file(bam_index) from Channel.fromPath(params.bams).map{ bam -> [ bam.getSimpleName(), bam, bam + (bam.getExtension() == "bam" ? ".bai" : ".crai") ] }
-        each file(fasta) from Channel.fromPath(params.fasta)
-	each file(targets) from Channel.fromPath(params.targets_bed)
-
-        output:
-        file "${name}.dp.txt" into bam_dp
-	file "*.by_chrom.txt" into bam_dp_by_chrom
-
-	publishDir "results/dp/", pattern: "*.by_chrom.txt", mode: "copy"
-
-        """
-	samtools depth -a -s -q20 -Q20 --reference ${fasta} -b ${targets} ${bam} | aggregate_dp.py -o ${name}.dp
-        """
-}
-
 
 process concat_bams_dp {
 
 	executor "local"
+	memory '1 GB'
 	cpus 1
 
 	input:
-	file bam_dp_files from bam_dp.collect()
+	path  bam_dp_files
 
 	output:
-	file("dp.txt") into dp
+	path("dp.txt")
 
 	"""
 	filename=`find . -name "*.dp.txt" | head -n1`
@@ -127,48 +167,65 @@ process concat_bams_dp {
 }
 
 
-
-process join {
+process joined {
 
 	executor "local"
+	memory '1 GB'
 	cpus 1
 
 	input:
-	file dp_file from dp
-	file contamination_1000g_file from _1000g_contamination
-	file ancestry_1000g_file from _1000g_ancestry
+	path dp_file
+	path contamination_1000g_file
+	path log_1000g_file
+	path ancestry_1000g_file
 
 	output:
-	file "summary.txt" into summarized
+	path("summary.txt")
 
 	publishDir "results/", pattern: "*.txt", mode: "copy"
 
 	"""
-	join --check-order --header ${contamination_1000g_file} ${ancestry_1000g_file} > 1000g.txt
+	join --check-order --header ${contamination_1000g_file} ${log_1000g_file}  | join --check-order --header - ${ancestry_1000g_file} > 1000g.txt
 	join --check-order --header 1000g.txt ${dp_file} > summary.txt
 	"""
 }
 
+
 process plot {
 
-        executor "local"
-        cpus 1
+	executor "local"
+	memory '4 GB'
+	cpus 1
 
-        input:
-        file summary from summarized
-        file reported_sex from Channel.fromPath(params.reported_sex)
+	input:
+	path summary
+	path reported_sex
 
-        output:
-        file "*.jpeg" into plots
-        file "report.pdf" into report
+	output:
+	path("*.jpeg")
+	path("report.pdf")
 
-        publishDir "results/plots/", pattern: "*.jpeg", mode: "copy"
-        publishDir "results/", pattern: "*.pdf", mode: "copy"
+	publishDir "results/plots/", pattern: "*.jpeg", mode: "copy"
+	publishDir "results/", pattern: "*.pdf", mode: "copy"
 
-        """
-        generate_plots.py -s ${summary} -pca1 ${params.verifyBamId_dir}/resource/exome/1000g.phase3.10k.${params.genome_build}.exome.vcf.gz.dat.V -pop1 ${workflow.projectDir}/Populations/1000g_populations.txt -sex ${reported_sex}
-        make_pdf.py -o report.pdf
-        """
+    """
+    generate_plots.py -s ${summary} -pca1 ${params.verifyBamId_dir}/resource/exome/1000g.phase3.10k.${params.genome_build}.exome.vcf.gz.dat.V -pop1 ${workflow.projectDir}/Populations/1000g_populations.txt -sex ${reported_sex}
+    make_pdf.py -o report.pdf
+    """
 }
 
+workflow {
+	bams = Channel.fromFilePairs("${params.bams}", size: -1) { file -> file.getName().replaceAll("(.bai|.crai)\$", "") }.map {it -> [it[0].replaceAll("(.bam|.cram)\$", ""), it[1][0], it[1][1]] }
+
+	verify_estimates = verify_bams(bams, Channel.fromPath(params.fasta).collect())
+	depths = compute_bams_dp(bams, Channel.fromPath(params.fasta).collect(), Channel.fromPath(params.targets_bed))
+
+	all = joined(
+		concat_bams_dp(depths[0].collect()),
+		concat_1000g_contamination(verify_estimates[1].collect()),
+		concat_1000g_log(verify_estimates[2].collect()),
+ 		concat_1000g_ancestry(verify_estimates[0].collect())
+	) 
+	plot(all, Channel.fromPath(params.reported_sex))
+}
 
